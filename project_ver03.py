@@ -782,6 +782,8 @@ nan_mask = y.isnull()
 X = X[~nan_mask]
 y = y[~nan_mask]
 
+
+
 # Create transformers
 numerical_transformer = SimpleImputer(strategy='mean')
 categorical_transformer = Pipeline(steps=[

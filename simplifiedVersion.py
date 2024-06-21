@@ -23,6 +23,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import ExtraTreesClassifier
 
+
 #   1. Data exploration: a complete review and analysis of the dataset including:
 #   1.1. Load and describe data elements (columns), provide descriptions & types,
 # ranges and values of elements as appropriate. – use pandas, numpy and any
@@ -228,6 +229,9 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import RocCurveDisplay, roc_curve
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
+
 
 # -------------------------- data selection
 
@@ -323,14 +327,31 @@ print('Test score: ', test_score)
 
 # b) Decision Tree
 print ('\n--------------- Decision Tree ---------------')
-DT_clf = DecisionTreeClassifier(max_depth=5, criterion = 'entropy',
-                                     random_state=4)
+DT_clf = DecisionTreeClassifier(random_state=4)
 
 # Combine preprocessor and model in one pipeline
 DT_model = Pipeline(steps=[('preprocessor', preprocessor),
                         ('classifier', DT_clf)])
 
+parameters = [{'classifier__min_samples_split' : range(10,300,20),
+               'classifier__max_depth': range(1,30,2),
+               'classifier__min_samples_leaf':range(1,15,3)
+              },
+             ]
+grid_search_matheus = RandomizedSearchCV(estimator=DT_model,
+                           scoring='accuracy',
+                           param_distributions=parameters,
+                           cv=5,
+                           n_iter = 7,
+                           refit = True,
+                           random_state=4,
+                           verbose = 3
+                           )
+
+grid_search_matheus.fit(X_train, y_train)
+
 # Fit the model
+DT_model = grid_search_matheus.best_estimator_
 DT_model.fit(X_train, y_train)
 
 # Cross validation.
@@ -354,7 +375,25 @@ SVC_clf = SVC(kernel='rbf')
 SVC_model = Pipeline(steps=[('preprocessor', preprocessor),
                         ('classifier', SVC_clf)])
 
+parameters = [{'classifier__kernel': ['rbf', 'sigmoid'],
+               'classifier__C':  [1, 10, 100],
+               'classifier__gamma': [0.01, 0.1, 1]
+               },]
+
+grid_search_matheus = RandomizedSearchCV(estimator=SVC_model,
+                           scoring='accuracy',
+                           param_distributions=parameters,
+                           cv=3,
+                           n_iter = 7,
+                           refit = True,
+                           random_state=4,
+                           verbose = 3
+                           )
+
+grid_search_matheus.fit(X_train, y_train)
+
 # Fit the model
+SVC_model = grid_search_matheus.best_estimator_
 SVC_model.fit(X_train, y_train)
 
 # Cross validation.
@@ -369,33 +408,6 @@ test_score = SVC_model.score(X_test, y_test)
 print('Train score: ', train_score)
 print('Test score: ', test_score)
 #-------------------
-
-# # d) Random Forest
-# print ('\n############ Random Forest ###############')
-# forest_reg = RandomForestRegressor(n_estimators=100, random_state=4)
-
-# # Combine preprocessor and model in one pipeline
-# model = Pipeline(steps=[('preprocessor', preprocessor),
-#                         ('classifier', forest_reg)])
-
-# # Fit the model
-# model.fit(X_train, y_train)
-
-# predictions = model.predict(X_train)
-# forest_mse = mean_squared_error(y_train, predictions)
-# forest_rmse = np.sqrt(forest_mse)
-# forest_rmse
-
-# forest_scores = cross_val_score(model,
-#                                 X_train,
-#                                 y_train,
-#                                 scoring="neg_mean_squared_error", cv=10)
-# forest_rmse_scores = np.sqrt(-forest_scores)
-# def display_scores(scores):
-#     print("Mean:", scores.mean())
-#     print("Standard deviation:", scores.std())
-
-# display_scores(forest_rmse_scores)
 
 # d) Random Forest
 print ('\n--------------- Random Forest ---------------')
@@ -464,9 +476,22 @@ def report(model, name, X_test, y_test):
       conf_matrix, annot=True, fmt='d', 
       cbar=False, cmap='flag', vmax=500 
   )
-  # y_score = model.decision_function(X_test)
-  # fpr, tpr, _ = roc_curve(y_test, y_score)
-  # roc_display = RocCurveDisplay(fpr=fpr, tpr=tpr).plot()
+  if(type(model._final_estimator) ==
+      type(DecisionTreeClassifier())
+     or
+     type(model._final_estimator) ==
+      type(RandomForestClassifier())
+     or
+     type(model._final_estimator) ==
+      type(MLPClassifier())
+     ):
+    y_prob = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, thresholds = roc_curve(y_test, y_prob)
+    roc_display = RocCurveDisplay(fpr=fpr, tpr=tpr).plot()
+  else:
+    y_score = model.decision_function(X_test)
+    fpr, tpr, _ = roc_curve(y_test, y_score)
+    roc_display = RocCurveDisplay(fpr=fpr, tpr=tpr).plot()
 
   plt.title(name)
   ax.set_xlabel("Predicted", labelpad=20)
@@ -481,3 +506,5 @@ report(Forest_model, 'Random Forest', X_test, y_test)
 report(NN_model, 'Neural Network', X_test, y_test)
 
 # 4.2. Select and recommend the best performing model
+type(DT_model._final_estimator)
+type(Forest_model._final_estimator)
